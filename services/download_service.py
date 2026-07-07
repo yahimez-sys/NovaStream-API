@@ -1,0 +1,317 @@
+import glob
+import os
+import uuid
+from time import perf_counter
+
+import yt_dlp
+
+from core.manager import manager
+from core.progress import ProgressHook
+from utils.logger import logger
+
+
+class DownloadService:
+
+    # =========================================
+    # Buscar archivo descargado
+    # =========================================
+
+    @staticmethod
+    def _find_downloaded_file(output_dir: str, file_id: str):
+
+        pattern = os.path.join(output_dir, f"{file_id}.*")
+
+        files = [
+            f for f in glob.glob(pattern)
+            if not f.endswith((".part", ".ytdl", ".temp"))
+        ]
+
+        if not files:
+            return None
+
+        priority = [
+            ".mp4",
+            ".mkv",
+            ".webm",
+            ".mp3",
+            ".m4a",
+            ".aac",
+            ".opus",
+            ".wav"
+        ]
+
+        for ext in priority:
+
+            for file in files:
+
+                if file.lower().endswith(ext):
+
+                    return file
+
+        return files[0]
+
+    # =========================================
+    # Calidad
+    # =========================================
+
+    @staticmethod
+    def _build_format(quality: str):
+
+        formats = {
+
+            "audio": "bestaudio/best",
+
+            "360": "bestvideo[height<=360]+bestaudio/best",
+
+            "480": "bestvideo[height<=480]+bestaudio/best",
+
+            "720": "bestvideo[height<=720]+bestaudio/best",
+
+            "1080": "bestvideo[height<=1080]+bestaudio/best",
+
+            "1440": "bestvideo[height<=1440]+bestaudio/best",
+
+            "4k": "bestvideo[height<=2160]+bestaudio/best",
+
+            "best": "bestvideo+bestaudio/best"
+
+        }
+
+        return formats.get(quality, formats["best"])
+
+    # =========================================
+    # Opciones yt-dlp
+    # =========================================
+
+    @staticmethod
+    def _build_options(job, output_dir, file_id, hook):
+
+        fmt = DownloadService._build_format(job.quality)
+
+        ydl_opts = {
+
+            "format": fmt,
+
+            "outtmpl": os.path.join(
+                output_dir,
+                file_id + ".%(ext)s"
+            ),
+
+            "progress_hooks": [hook],
+
+            "quiet": True,
+
+            "no_warnings": True,
+
+            "continuedl": True,
+
+            "retries": 10,
+
+            "fragment_retries": 10,
+
+            "concurrent_fragment_downloads": 8,
+
+            "socket_timeout": 30,
+
+            "noplaylist": True,
+
+            "ignoreerrors": False,
+
+        }
+
+        # Video
+
+        if job.quality != "audio":
+
+            ydl_opts["merge_output_format"] = "mp4"
+
+        # Audio
+
+        else:
+
+            ydl_opts["postprocessors"] = [
+
+                {
+
+                    "key": "FFmpegExtractAudio",
+
+                    "preferredcodec": "mp3",
+
+                    "preferredquality": "320"
+
+                }
+
+            ]
+
+        return ydl_opts
+
+    # =========================================
+    # Descarga principal
+    # =========================================
+
+    @staticmethod
+    def download_job(task):
+
+        # Obtener Job desde la Task
+
+        job = manager.get(task.job_id)
+
+        if job is None:
+
+            logger.error(
+
+                f"Job no encontrado | Task={task.id}"
+
+            )
+
+            task.fail()
+
+            return
+
+        output_dir = "downloads"
+
+        os.makedirs(output_dir, exist_ok=True)
+
+        file_id = str(uuid.uuid4())
+
+        hook = ProgressHook(job)
+
+        start_time = perf_counter()
+
+        logger.info(
+
+            f"Iniciando descarga | "
+
+            f"Job={job.id} | "
+
+            f"Task={task.id}"
+
+        )
+
+        try:
+
+            job.start()
+
+            task.start()
+
+            ydl_opts = DownloadService._build_options(
+
+                job,
+
+                output_dir,
+
+                file_id,
+
+                hook
+
+            )
+
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+
+                info = ydl.extract_info(
+
+                    job.url,
+
+                    download=True
+
+                )
+
+            file_path = DownloadService._find_downloaded_file(
+
+                output_dir,
+
+                file_id
+
+            )
+
+            if not file_path:
+
+                logger.error(
+
+                    f"Archivo no encontrado | "
+
+                    f"Job={job.id}"
+
+                )
+
+                manager.fail(
+
+                    job.id,
+
+                    "No se encontró el archivo descargado."
+
+                )
+
+                task.fail()
+
+                return
+
+            # =====================================
+            # Datos finales
+            # =====================================
+
+            job.file = file_path
+
+            job.title = info.get("title", "")
+
+            job.thumbnail = info.get("thumbnail", "")
+
+            job.extension = os.path.splitext(file_path)[1]
+
+            try:
+
+                job.filesize = os.path.getsize(file_path)
+
+            except OSError:
+
+                job.filesize = 0
+
+                logger.warning(
+
+                    f"No fue posible obtener el tamaño | "
+
+                    f"Job={job.id}"
+
+                )
+
+            # =====================================
+            # Completar
+            # =====================================
+
+            job.complete()
+
+            task.complete()
+
+            elapsed = perf_counter() - start_time
+
+            logger.info(
+
+                f"Descarga completada | "
+
+                f"Job={job.id} | "
+
+                f"Tiempo={elapsed:.2f}s"
+
+            )
+
+        except Exception as e:
+
+            manager.fail(
+
+                job.id,
+
+                str(e)
+
+            )
+
+            task.fail()
+
+            logger.error(
+
+                f"Error descarga | "
+
+                f"Job={job.id} | "
+
+                f"Error={str(e)}"
+
+            )

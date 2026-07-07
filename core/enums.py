@@ -1,0 +1,26 @@
+from enum import Enum
+
+
+class JobStatus(str, Enum):
+
+    CREATED = "CREATED"
+
+    PREPARING = "PREPARING"
+
+    ANALYZING = "ANALYZING"
+
+    QUEUED = "QUEUED"
+
+    DOWNLOADING = "DOWNLOADING"
+
+    PAUSED = "PAUSED"
+
+    MERGING = "MERGING"
+
+    CONVERTING = "CONVERTING"
+
+    COMPLETED = "COMPLETED"
+
+    CANCELLED = "CANCELLED"
+
+    FAILED = "FAILED"

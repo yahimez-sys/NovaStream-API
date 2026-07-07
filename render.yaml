@@ -1,0 +1,40 @@
+services:
+  - type: web
+    name: novastream-api
+
+    runtime: python
+
+    plan: free
+
+    buildCommand: |
+      pip install --upgrade pip
+      pip install -r requirements.txt
+
+    startCommand: uvicorn app:app --host 0.0.0.0 --port $PORT
+
+    autoDeploy: true
+
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.13.4
+
+      - key: DEBUG
+        value: "False"
+
+      - key: API_NAME
+        value: "NovaStream API"
+
+      - key: API_VERSION
+        value: "1.0.0"
+
+      - key: DEFAULT_AUDIO_FORMAT
+        value: "mp3"
+
+      - key: DEFAULT_VIDEO_FORMAT
+        value: "mp4"
+
+      - key: MAX_DOWNLOAD_TIME
+        value: "600"
+
+      - key: MAX_FILE_SIZE_MB
+        value: "2048"
