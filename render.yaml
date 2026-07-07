@@ -3,7 +3,6 @@ services:
     name: novastream-api
 
     runtime: python
-
     plan: free
 
     buildCommand: |
@@ -16,7 +15,7 @@ services:
 
     envVars:
       - key: PYTHON_VERSION
-        value: 3.13.4
+        value: "3.12.8"
 
       - key: DEBUG
         value: "False"
