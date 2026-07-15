@@ -8,6 +8,7 @@ import yt_dlp
 
 from core.manager import manager
 from core.progress import ProgressHook
+from utils.config import YTDLP_COOKIES_FILE
 from utils.logger import logger
 
 
@@ -167,6 +168,9 @@ class DownloadService:
             },
 
         }
+
+        if YTDLP_COOKIES_FILE and os.path.isfile(YTDLP_COOKIES_FILE):
+            ydl_opts["cookiefile"] = YTDLP_COOKIES_FILE
 
         # Video
 

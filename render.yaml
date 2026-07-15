@@ -37,3 +37,9 @@ services:
 
       - key: MAX_FILE_SIZE_MB
         value: "2048"
+
+      # Ruta al cookies.txt subido como Secret File en Render
+      # (Settings > Secret Files). Se deja sin valor en el
+      # blueprint para no commitear rutas/secretos.
+      - key: YTDLP_COOKIES_FILE
+        sync: false

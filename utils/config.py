@@ -48,6 +48,14 @@ LOGS_DIR.mkdir(exist_ok=True)
 
 YTDLP_COMMAND = os.getenv("YTDLP_COMMAND", "yt-dlp")
 
+# Ruta a un cookies.txt (formato Netscape) de una cuenta real de
+# YouTube. Ayuda a evitar el bloqueo "Sign in to confirm you're
+# not a bot" cuando se descarga desde IPs de datacenter (Render).
+# En Render: subir como Secret File (queda en /etc/secrets/<nombre>)
+# y apuntar esta variable a esa ruta.
+
+YTDLP_COOKIES_FILE = os.getenv("YTDLP_COOKIES_FILE", "")
+
 # ==========================================================
 # FFmpeg
 # ==========================================================

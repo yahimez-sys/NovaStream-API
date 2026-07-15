@@ -1,7 +1,10 @@
+import os
 from copy import deepcopy
 from typing import Any, Dict, Iterable, List, Tuple
 
 import yt_dlp
+
+from utils.config import YTDLP_COOKIES_FILE
 
 
 class YTService:
@@ -16,7 +19,7 @@ class YTService:
 
     @staticmethod
     def _build_options(player_clients: Iterable[str]) -> Dict[str, Any]:
-        return {
+        opts = {
             "quiet": True,
             "no_warnings": True,
             "noplaylist": True,
@@ -30,6 +33,11 @@ class YTService:
                 }
             },
         }
+
+        if YTDLP_COOKIES_FILE and os.path.isfile(YTDLP_COOKIES_FILE):
+            opts["cookiefile"] = YTDLP_COOKIES_FILE
+
+        return opts
 
     @staticmethod
     def _extract_with_clients(url: str, player_clients: Iterable[str]) -> Dict[str, Any]:
