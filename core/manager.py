@@ -189,5 +189,19 @@ class JobManager:
 
             database.save_job(job)
 
+    # =======================================
+    # Limpiar referencia de archivo entregado
+    # =======================================
+
+    def clear_file(self, job_id):
+
+        job = self.get(job_id)
+
+        if job:
+
+            job.file = ""
+
+            database.save_job(job)
+
 
 manager = JobManager()

@@ -2,6 +2,7 @@ import glob
 import os
 import uuid
 from time import perf_counter
+from typing import Iterable, Tuple
 
 import yt_dlp
 
@@ -11,6 +12,43 @@ from utils.logger import logger
 
 
 class DownloadService:
+
+    # =========================================
+    # Clientes yt-dlp (evitar bloqueo "confirma
+    # que no eres un robot" de YouTube)
+    #
+    # android/ios primero: no dependen del
+    # challenge JS del cliente "web", que es el
+    # que más activa la verificación anti-bot
+    # desde IPs de datacenter (como las de Render).
+    # =========================================
+
+    CLIENT_GROUPS: Tuple[Tuple[str, ...], ...] = (
+        ("android",),
+        ("ios",),
+        ("web",),
+        ("tv",),
+        ("mweb",),
+    )
+
+    # =========================================
+    # Limpiar restos de un intento anterior
+    # =========================================
+
+    @staticmethod
+    def _cleanup_partial(output_dir: str, file_id: str):
+
+        pattern = os.path.join(output_dir, f"{file_id}.*")
+
+        for f in glob.glob(pattern):
+
+            try:
+
+                os.remove(f)
+
+            except OSError:
+
+                pass
 
     # =========================================
     # Buscar archivo descargado
@@ -84,7 +122,7 @@ class DownloadService:
     # =========================================
 
     @staticmethod
-    def _build_options(job, output_dir, file_id, hook):
+    def _build_options(job, output_dir, file_id, hook, player_clients: Iterable[str]):
 
         fmt = DownloadService._build_format(job.quality)
 
@@ -117,6 +155,17 @@ class DownloadService:
 
             "ignoreerrors": False,
 
+            "extractor_args": {
+
+                "youtube": {
+
+                    "player_client": list(player_clients),
+                    "formats": ["missing_pot", "duplicate", "incomplete"]
+
+                }
+
+            },
+
         }
 
         # Video
@@ -144,6 +193,68 @@ class DownloadService:
             ]
 
         return ydl_opts
+
+    # =========================================
+    # Descarga con fallback de clientes
+    # =========================================
+
+    @staticmethod
+    def _download_with_fallback(job, output_dir, file_id, hook):
+
+        last_error = None
+
+        for index, clients in enumerate(DownloadService.CLIENT_GROUPS):
+
+            if index > 0:
+
+                logger.warning(
+
+                    f"Reintentando descarga con cliente "
+                    f"'{'/'.join(clients)}' | Job={job.id}"
+
+                )
+
+                DownloadService._cleanup_partial(output_dir, file_id)
+
+            ydl_opts = DownloadService._build_options(
+
+                job,
+
+                output_dir,
+
+                file_id,
+
+                hook,
+
+                clients
+
+            )
+
+            try:
+
+                with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+
+                    return ydl.extract_info(
+
+                        job.url,
+
+                        download=True
+
+                    )
+
+            except Exception as e:
+
+                last_error = e
+
+                logger.warning(
+
+                    f"Falló descarga con cliente "
+                    f"'{'/'.join(clients)}' | "
+                    f"Job={job.id} | Error={str(e)}"
+
+                )
+
+        raise last_error
 
     # =========================================
     # Descarga principal
@@ -194,7 +305,7 @@ class DownloadService:
 
             task.start()
 
-            ydl_opts = DownloadService._build_options(
+            info = DownloadService._download_with_fallback(
 
                 job,
 
@@ -205,16 +316,6 @@ class DownloadService:
                 hook
 
             )
-
-            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-
-                info = ydl.extract_info(
-
-                    job.url,
-
-                    download=True
-
-                )
 
             file_path = DownloadService._find_downloaded_file(
 
