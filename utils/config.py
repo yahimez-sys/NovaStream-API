@@ -7,6 +7,7 @@ Archivo: utils/config.py
 
 from pathlib import Path
 import os
+import shutil
 
 from dotenv import load_dotenv
 
@@ -53,8 +54,27 @@ YTDLP_COMMAND = os.getenv("YTDLP_COMMAND", "yt-dlp")
 # not a bot" cuando se descarga desde IPs de datacenter (Render).
 # En Render: subir como Secret File (queda en /etc/secrets/<nombre>)
 # y apuntar esta variable a esa ruta.
+#
+# Los Secret Files de Render son de solo lectura, pero yt-dlp
+# necesita reescribir el cookiejar tras cada uso (Google rota
+# tokens de sesión); si no puede guardarlo, las cookies quedan
+# obsoletas después del primer uso y vuelve el bloqueo anti-bot.
+# Por eso copiamos el archivo a una ruta escribible (TEMP_DIR) al
+# arrancar el proceso y usamos esa copia para todo lo demás.
 
-YTDLP_COOKIES_FILE = os.getenv("YTDLP_COOKIES_FILE", "")
+_YTDLP_COOKIES_SOURCE = os.getenv("YTDLP_COOKIES_FILE", "")
+
+YTDLP_COOKIES_FILE = ""
+
+if _YTDLP_COOKIES_SOURCE and Path(_YTDLP_COOKIES_SOURCE).is_file():
+
+    _writable_cookies = TEMP_DIR / "cookies.txt"
+
+    if not _writable_cookies.exists():
+
+        shutil.copyfile(_YTDLP_COOKIES_SOURCE, _writable_cookies)
+
+    YTDLP_COOKIES_FILE = str(_writable_cookies)
 
 # ==========================================================
 # FFmpeg
