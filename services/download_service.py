@@ -18,17 +18,20 @@ class DownloadService:
     # Clientes yt-dlp (evitar bloqueo "confirma
     # que no eres un robot" de YouTube)
     #
-    # android/ios primero: no dependen del
-    # challenge JS del cliente "web", que es el
-    # que más activa la verificación anti-bot
-    # desde IPs de datacenter (como las de Render).
+    # ios primero: es el que más consistentemente
+    # devuelve formatos DASH completos (video+audio
+    # por separado, mejor calidad). android como
+    # respaldo (formatos limitados pero funcionales).
+    # web/mweb solo como último recurso.
+    #
+    # "tv" queda fuera: sus formatos vienen cifrados
+    # con DRM, yt-dlp no puede descargarlos nunca.
     # =========================================
 
     CLIENT_GROUPS: Tuple[Tuple[str, ...], ...] = (
-        ("android",),
         ("ios",),
+        ("android",),
         ("web",),
-        ("tv",),
         ("mweb",),
     )
 
