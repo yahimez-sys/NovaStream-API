@@ -199,6 +199,26 @@ class DownloadService:
         return ydl_opts
 
     # =========================================
+    # ¿Vale la pena reintentar con otro cliente?
+    #
+    # El bloqueo "Sign in to confirm you're not
+    # a bot" es a nivel de cuenta/cookie/IP, no
+    # de cliente: cambiar de cliente no lo evita
+    # y solo suma peticiones que pueden empeorar
+    # que la cuenta se marque como sospechosa.
+    # =========================================
+
+    @staticmethod
+    def _is_bot_check_error(error: Exception) -> bool:
+
+        message = str(error).lower()
+
+        return (
+            "confirm you" in message
+            and "not a bot" in message
+        )
+
+    # =========================================
     # Descarga con fallback de clientes
     # =========================================
 
@@ -257,6 +277,17 @@ class DownloadService:
                     f"Job={job.id} | Error={str(e)}"
 
                 )
+
+                if DownloadService._is_bot_check_error(e):
+
+                    logger.warning(
+
+                        f"Bloqueo anti-bot detectado, se detiene el "
+                        f"reintento con otros clientes | Job={job.id}"
+
+                    )
+
+                    break
 
         raise last_error
 
